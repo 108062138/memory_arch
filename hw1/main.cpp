@@ -8,7 +8,7 @@
 #include <iomanip> // Include for std::setw
 
 #define LINE_STATE int32_t
-#define UINT32 uint32_t
+#define UINT32 int32_t
 #define INT32 int32_t
 #define Addr_t uint32_t
 #define old_enough (3)
@@ -328,7 +328,8 @@ void CACHE_REPLACEMENT_STATE::UpdateLRU( UINT32 setIndex, INT32 updateWayID )
 void CACHE_REPLACEMENT_STATE :: Handle_SHiP_Cache_Hit(UINT32 setIndex, INT32 updateWayID){
     cout << "Hit" << " " << updateWayID << endl;
     repl[ setIndex ][ updateWayID ].outcome = true;
-    SHCT[repl[ setIndex ][ updateWayID ].signature]++;
+    if(SHCT[repl[ setIndex ][ updateWayID ].signature] <3)
+        SHCT[repl[ setIndex ][ updateWayID ].signature]++;
     repl[ setIndex ][ updateWayID ].RRPV = 0;
 
     cout << std::left << std::setw(11) << "RRPV:";
@@ -381,9 +382,14 @@ void CACHE_REPLACEMENT_STATE :: Handle_SHiP_Cache_Hit(UINT32 setIndex, INT32 upd
 */
 void CACHE_REPLACEMENT_STATE :: Handle_SHiP_Cache_Miss(UINT32 setIndex, UINT32 tid, Addr_t PC, UINT32 accessType){
     INT32 victim = GetVictimInSet(tid, setIndex, nullptr, assoc, PC, 0, accessType);
-    if(repl[setIndex][victim].outcome == false)
-        if(SHCT[repl[setIndex][victim].signature] > 0)
+    int last_signature = repl[setIndex][victim].signature;
+    bool modify_shct = false;
+    if(repl[setIndex][victim].outcome == false){
+        modify_shct = true;
+        if(SHCT[repl[setIndex][victim].signature] > 0){
             SHCT[repl[setIndex][victim].signature]--;
+        }
+    }
     // insert the new line
 
     repl[setIndex][victim].outcome = false;
@@ -434,7 +440,7 @@ void CACHE_REPLACEMENT_STATE :: Handle_SHiP_Cache_Miss(UINT32 setIndex, UINT32 t
     cout << std::left << std::setw(11) << "SHCT:";
 
     for(int i=0; i<numCounters; i++){
-        if(i == repl[ setIndex ][ victim ].signature){
+        if(i == last_signature && modify_shct){
             cout << "(" << SHCT[i] << ")";
         }else{
             cout << SHCT[i];
@@ -510,8 +516,7 @@ int main() {
             hitway = op.wayHit;
         cs.UpdateReplacementState(op.accessedSetNumber,hitway, nullptr, 
                                     op.programCounter, op.programCounter, 0, op.hasWayHit);
-        if(i!=numOperations-1)
-            cout << endl;
+        cout << endl;
     }
     return 0;
 }
