@@ -111,8 +111,6 @@ public:
                 if(*rq==target){
                     sub_queue.erase(rq);
                     break;
-                }else{
-                    cout << "wtfffffffff";
                 }
             }
             if(target.at_row==cur_req.at_row)
@@ -152,10 +150,10 @@ void fcfs_solver(){
 
         // try to put a new request on the queue
         if(get_queue_water_level() < queue_size){
-            if(buffer.size()>0)
+            if(buffer.size()>0){
                 about_to_enter_queue_request = buffer.front();
+            }
         }
-
         // try to put bank sub queue's request over the bank
         for(int i=0;i<number_of_bank;i++){
             my_banks[i].check_valid();
@@ -164,12 +162,11 @@ void fcfs_solver(){
                 about_to_enter_dram_requests[i] = tmp;
             }
         }
-
+        
         // update each bank's subqueue
         for(int i=0;i<number_of_bank;i++){
             my_banks[i].update_bank(about_to_enter_dram_requests[i]);
         }
-
         // update the queue and buffer
         if(about_to_enter_queue_request!=dummy_req){
             if(buffer.size()>0){
@@ -192,6 +189,7 @@ void fcfs_solver(){
         }
         cout << endl;
         global_cyc++;
+        
         for(int i=0;i<number_of_bank;i++){
             my_banks[i].check_valid();
         }
@@ -199,7 +197,7 @@ void fcfs_solver(){
 }
 
 void solve(){
-    if(policy==FCFS){
+    if(policy==FCFS || policy==FR_FCFS){
         fcfs_solver();
     }
 }
@@ -212,7 +210,6 @@ void handle_input(){
         cin >> req_serial_number >> req_pid >> req_at_bank >> req_at_row;
         request tmp_req(req_serial_number, req_pid, req_at_bank, req_at_row);
         buffer.emplace_back(tmp_req);
-        // cout << "ddd: " <<buffer.size() << endl;
     }
 }
 
