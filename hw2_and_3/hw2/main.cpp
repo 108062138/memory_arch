@@ -2,6 +2,7 @@
 #include<queue>
 #include<list>
 #include<iomanip>
+#include<vector>
 
 #define FCFS 0
 #define FR_FCFS 1
@@ -11,12 +12,12 @@ using namespace std;
 
 int number_of_process, number_of_bank, queue_size, policy;
 int row_hit_latency, row_miss_latency, marking_cap, number_of_following_request;
-int global_cycle;
-int num_finish_requests;
-int queue_valid_request;
-int num_on_queue_requests;
 
-class request{
+int finished_request;
+int global_cyc;
+
+class request
+{
 public:
     int serial_number;
     int pid;
@@ -28,9 +29,6 @@ public:
         at_bank = _at_bank;
         at_row = _at_row;
     }
-    // void demo_request(){
-    //     cout << serial_number << " " << pid << " " << at_bank << " " << at_row << endl;
-    // }
     void demo_request(){
         cout << "t"<<std::left << std::setw(5) << serial_number;
         cout << "P"<<std::left << std::setw(2) << pid;
@@ -51,230 +49,158 @@ public:
     }
 };
 
-request dummy_request(-1,-2,-3,-4);
+request dummy_req(-11, -22, -33, -44);
 
-class bank {
-private:
-    list<request> bank_ls;
+class fifo_bank{
 public:
-    request cur_request;
+    request cur_req;
     int max_latency;
     int cur_latency;
-    int bank_id;
-    bool used;
-    bank(request& _cur_request, int _bank_id)
-        : cur_request(_cur_request), max_latency(-1), cur_latency(-1), bank_id(_bank_id),used(false) {
-    }
-    void update_bank_cur_latency_used() {
-        if(used){
-            if (cur_latency < max_latency-1) {
-                cur_latency++;
-            }
-        } 
-    }
-    void update_bank_request_max_latency_cur_latency_used(request& target){
-        if(used){
-            cout << "fuck up used~~~~~~" << endl;
-            return;
-        }
-        if(target.at_bank != bank_id){
-            cout << "fuck up bank id~~~~~~" << endl;
-            return;
-        }
-        if(cur_request.at_row==target.at_row)
-            max_latency = row_hit_latency;
-        else
-            max_latency = row_miss_latency;
-        cur_latency = 0;// since we will step 
-        // update bank's current request by target
-        cur_request = target;
-        used = true;
-    }
-    void show_bank(){
-        cout << "==============================================" << endl;
-        cout << "at cycle: "<< global_cycle << endl;
-        cout << cur_latency << "/" << max_latency << endl;
-        if(used){
-            cout << "used" << endl;
-        }else{
-            cout << "empty" << endl;
-        }
-        cout << "cur request: ";
-        cur_request.demo_request();
-        cout << endl;
-        cout << "subqueue size: "<< bank_ls.size() << endl;
-        demo_subqueue();
-        cout << endl;
-        cout << "==============================================" << endl;
-    }
-    void demo_subqueue(){
-        for(auto rq=bank_ls.begin();rq!=bank_ls.end();++rq){
-            (*rq).demo_request();
-            cout << "   ";
-        }
-    }
-    request fcfs_pick_request(){
-        // if(global_cycle==5){
-        //     show_bank();
-        // }
-        // if(global_cycle==6){
-        //     show_bank();
-        // }
-
-        if(used) return dummy_request;
-        for(auto rq=bank_ls.begin();rq!=bank_ls.end();++rq){
-            return *rq;
-        }
-        return dummy_request;
-    }
-    int remove_bank_ls(request& target){
-        if(target==dummy_request) return -1;
-        for(auto rq=bank_ls.begin();rq!=bank_ls.end();++rq){
-            if(*rq==target){
-                bank_ls.erase(rq);
-                return 1;
-            }
-        }
-        return -1;
-    }
-    void append_bank_ls(request& target){
-        bank_ls.emplace_back(target);
-    }
-    int get_bank_ls_size(){
-        return bank_ls.size();
-    }
+    bool occupied;
+    list<request> sub_queue;
+    fifo_bank() : cur_req(dummy_req), max_latency(row_hit_latency), cur_latency(row_hit_latency), occupied(false) {}
     void demo_bank(){
-        if(used){
+        if(occupied){
             if(cur_latency==0){
-                cur_request.demo_request();
-            }else if(cur_latency>0 && cur_latency<max_latency-1){
-                cout << "|              |";
+                cur_req.demo_request();
             }else if(cur_latency==max_latency-1){
                 cout << " -------------- ";
-                used = false;
-                num_finish_requests++;
             }else{
-                cout << " ?????????????? ";
+                cout << "|              |";
             }
         }else{
             cout << "                ";
         }
     }
-    void update_bank(request& target){
-        if(target!=dummy_request){
-            update_bank_request_max_latency_cur_latency_used(target);
+    request pick_request_from_subqueue(){
+        if(policy==FCFS){
+            if(occupied) return dummy_req;
+            for(auto rq=sub_queue.begin();rq!=sub_queue.end();++rq){
+                return *rq;
+            }
+            return dummy_req;
         }else{
-            update_bank_cur_latency_used();
+            if(occupied) return dummy_req;
+            for(auto rq=sub_queue.begin();rq!=sub_queue.end();++rq){
+                if((*rq).at_row == cur_req.at_row)
+                    return *rq;
+            }
+            for(auto rq=sub_queue.begin();rq!=sub_queue.end();++rq){
+                return *rq;
+            }
+            return dummy_req;
+        }
+        
+    }
+    void check_valid(){
+        if(occupied){
+            if(cur_latency==max_latency-1){
+                occupied = false;
+                finished_request++;
+            }
+        }
+    }
+    void update_bank(request& target){
+        if(target==dummy_req){
+            if(occupied){
+                if(cur_latency<max_latency-1)
+                    cur_latency++;
+            }
+        }else{
+            for(auto rq=sub_queue.begin();rq!=sub_queue.end();++rq){
+                if(*rq==target){
+                    sub_queue.erase(rq);
+                    break;
+                }else{
+                    cout << "wtfffffffff";
+                }
+            }
+            if(target.at_row==cur_req.at_row)
+                max_latency = row_hit_latency;
+            else
+                max_latency = row_miss_latency;
+            cur_latency = 0;
+            occupied = true;
+            cur_req = target;
         }
     }
 };
 
 list<request> buffer;
-vector<bank> my_banks;
-vector<request> on_queue_possible_request(4, dummy_request);
-request from_buffer_request = dummy_request;
+vector<fifo_bank> my_banks;
+vector<request> about_to_enter_dram_requests(4, dummy_req);
+request about_to_enter_queue_request = dummy_req;
 
-void see_queue_possible_request(){
-    cout << "$$:  ";
+int get_queue_water_level(){
+    int tmp = 0;
+    for(int i=0;i<number_of_bank;i++) tmp+= my_banks[i].sub_queue.size();
+    return tmp;
+}
+
+void fcfs_solver(){
+    finished_request = 0;
+    global_cyc = 0;
     for(int i=0;i<number_of_bank;i++){
-        on_queue_possible_request[i].demo_request();
-        cout << ">>>";
+        fifo_bank tmp;
+        my_banks.push_back(tmp);
     }
-}
+    
+    while(finished_request<number_of_following_request){
+        // init staging request
+        for(int i=0;i<number_of_bank;i++) about_to_enter_dram_requests[i] = dummy_req;
+        about_to_enter_queue_request = dummy_req;
 
-void initer(){
-    // init. from buffer request and on queue possible request by dummy request
-    from_buffer_request = dummy_request;
-    for(int i=0;i<number_of_bank;i++)
-        on_queue_possible_request[i] = dummy_request;
-}
-
-void get_queue_size(){
-    // collect the number of request on the queue
-    num_on_queue_requests = 0;
-    for(int i=0;i<number_of_bank;i++)
-        num_on_queue_requests += my_banks[i].get_bank_ls_size();
-}
-
-void my_printer(){
-    cout << std::left << std::setw(7) << global_cycle;
-    if(from_buffer_request!=dummy_request)
-        from_buffer_request.demo_request();
-    else
-        cout << "                ";
-    for(int i=0;i<number_of_bank;i++){
-        cout << "   ";
-        my_banks[i].demo_bank();
-    }
-    // get_queue_size();
-    // cout << "#on queue" << num_on_queue_requests;
-    cout << endl;
-}
-
-
-void handle_fcfs(){
-    while(num_finish_requests!=number_of_following_request){
-        initer();
-        get_queue_size();
-        
-        // for each bank, find a good request on queue to serve the dram
-        queue_valid_request = 0;
-        for(int i=0;i<number_of_bank;i++){
-            request tmp_req = my_banks[i].fcfs_pick_request();
-            if(tmp_req==dummy_request)continue;
-            queue_valid_request++;
-            on_queue_possible_request[i] = tmp_req;
-        }
-
-        // if we find good request on queue to serve the dram, 
-        // then take one content from buffer into the queue.
-        // if we can't find good request on queue, 
-        // we check if the number of request on queue exceeds the max,
-        // if so, grab a request from the buffer
-        if(num_on_queue_requests<queue_size){
+        // try to put a new request on the queue
+        if(get_queue_water_level() < queue_size){
             if(buffer.size()>0)
-                from_buffer_request = buffer.front();
+                about_to_enter_queue_request = buffer.front();
         }
-        // if(queue_valid_request>0){
-        //     if(buffer.size()>0)
-        //         from_buffer_request = buffer.front();
-        // }
 
-        // update bank's cycle
+        // try to put bank sub queue's request over the bank
         for(int i=0;i<number_of_bank;i++){
-            my_banks[i].update_bank(on_queue_possible_request[i]);
-            my_banks[i].remove_bank_ls(on_queue_possible_request[i]);
-        }
-
-        if(from_buffer_request!=dummy_request){
-            if(num_on_queue_requests<queue_size){
-                // first enque
-                my_banks[from_buffer_request.at_bank].append_bank_ls(from_buffer_request);
-                for(auto rq=buffer.begin();rq!=buffer.end();++rq){
-                    if(*rq==from_buffer_request){
-                        buffer.erase(rq);
-                        break;
-                    }
-                }
+            my_banks[i].check_valid();
+            request tmp = my_banks[i].pick_request_from_subqueue();
+            if(tmp!=dummy_req){
+                about_to_enter_dram_requests[i] = tmp;
             }
         }
-        // printing
-        my_printer();
-        global_cycle++;
+
+        // update each bank's subqueue
+        for(int i=0;i<number_of_bank;i++){
+            my_banks[i].update_bank(about_to_enter_dram_requests[i]);
+        }
+
+        // update the queue and buffer
+        if(about_to_enter_queue_request!=dummy_req){
+            if(buffer.size()>0){
+                buffer.pop_front();
+                int at_bank = about_to_enter_queue_request.at_bank;
+                my_banks[at_bank].sub_queue.push_back(about_to_enter_queue_request);
+            }
+        }
+
+        // print the request that enters the queue, print the bank's current status
+        cout << std::left << setw(7) << global_cyc;
+        if(about_to_enter_queue_request!=dummy_req){
+            about_to_enter_queue_request.demo_request();
+        }else{
+            cout << "                ";
+        }
+        for(int i=0;i<number_of_bank;i++){
+            cout << "   ";
+            my_banks[i].demo_bank();
+        }
+        cout << endl;
+        global_cyc++;
+        for(int i=0;i<number_of_bank;i++){
+            my_banks[i].check_valid();
+        }
     }
 }
 
 void solve(){
-    // init global cycle
-    global_cycle = 0;
-    num_finish_requests = 0;
-    // init bank
-    for(int i=0;i<number_of_bank;i++){
-        bank tmp(dummy_request, i);
-        my_banks.push_back(tmp);
-    }
     if(policy==FCFS){
-        handle_fcfs();
+        fcfs_solver();
     }
 }
 
@@ -286,6 +212,7 @@ void handle_input(){
         cin >> req_serial_number >> req_pid >> req_at_bank >> req_at_row;
         request tmp_req(req_serial_number, req_pid, req_at_bank, req_at_row);
         buffer.emplace_back(tmp_req);
+        // cout << "ddd: " <<buffer.size() << endl;
     }
 }
 
