@@ -218,7 +218,7 @@ void update_max_load_total_rule(){
     }
 }
 
-void fcfs_solver(){
+void dram_schedular(){
     finished_request = 0;
     global_cyc = 0;
     bool use_batch;
@@ -307,9 +307,7 @@ void fcfs_solver(){
 }
 
 void solve(){
-    if(policy==FCFS || policy==FR_FCFS || policy==PARBS){
-        fcfs_solver();
-    }
+    dram_schedular();
 }
 
 void handle_input(){
