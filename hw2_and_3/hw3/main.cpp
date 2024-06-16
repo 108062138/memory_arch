@@ -110,10 +110,12 @@ public:
             return dummy_req;
         }else if(policy==FR_FCFS){
             if(occupied) return dummy_req;
+            // try to find the first row hit request. if so, return it
             for(auto rq=sub_queue.begin();rq!=sub_queue.end();++rq){
                 if((*rq).at_row == cur_req.at_row)
                     return *rq;
             }
+            // find the first request. if so, return it
             for(auto rq=sub_queue.begin();rq!=sub_queue.end();++rq){
                 return *rq;
             }
@@ -124,7 +126,7 @@ public:
             for(auto rq=sub_queue.begin();rq!=sub_queue.end();++rq){
                 (*rq).cur_row = cur_req.at_row;
             }
-
+            // get the fiteset request
             auto max_it = std::max_element(sub_queue.begin(), sub_queue.end());
 
             if(max_it!=sub_queue.end()) return *max_it;
@@ -219,25 +221,22 @@ void update_max_load_total_rule(){
 }
 
 void dram_schedular(){
+    // init max load, total rule, my bank, finished_request, global_cyc
     finished_request = 0;
     global_cyc = 0;
-    bool use_batch;
     for(int i=0;i<number_of_bank;i++){
         fifo_bank tmp;
         my_banks.push_back(tmp);
     }
-
     for(int i=0;i<number_of_process;i++){
         max_load.push_back(0);
         total_rule.push_back(0);
     }
     
     while(finished_request<number_of_following_request){
-        // if(global_cyc>30) break;
         // init staging request
         for(int i=0;i<number_of_bank;i++) about_to_enter_dram_requests[i] = dummy_req;
         about_to_enter_queue_request = dummy_req;
-        use_batch = false;
 
         // try to put a new request on the queue
         if(get_queue_water_level() < queue_size){
@@ -250,7 +249,6 @@ void dram_schedular(){
         if(should_activate_batch()){
             batch_process();
             update_max_load_total_rule();
-            use_batch = true;
         }
 
         // try to put bank sub queue's request over the bank
@@ -286,20 +284,11 @@ void dram_schedular(){
             cout << "   ";
             my_banks[i].demo_bank();
         }
-        // cout << endl;
-        // if(use_batch) cout << "use batch";
-        // else cout << " hold.....";
-        // cout << endl;
-        // cout << "for   max: ";
-        // for(int j=0;j<number_of_process;j++)
-        //     cout << max_load[j] << " ";
-        // cout << endl;
-        // cout << "for total: ";
-        // for(int j=0;j<number_of_process;j++)
-        //     cout << total_rule[j] << " ";
         cout << endl;
         global_cyc++;
         
+        // for those request that is sended into bank, remove it from the bank
+        // if any request is expired, remove it 
         for(int i=0;i<number_of_bank;i++){
             my_banks[i].check_valid();
         }
